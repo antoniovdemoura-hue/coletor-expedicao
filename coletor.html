@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coletor Bipagem Zebra ZQ630</title>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 15px; text-align: center; background: #f0f2f5; margin: 0; }
+    .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); max-width: 400px; margin: 0 auto; }
+    button { background: #0066cc; color: white; border: none; padding: 14px 20px; font-size: 16px; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 10px; font-weight: bold; }
+    input { width: 90%; padding: 12px; margin: 10px 0; border: 2px solid #007bff; border-radius: 6px; text-align: center; font-size: 16px; font-weight: bold; }
+    #reader { width: 100%; margin-top: 15px; border-radius: 8px; overflow: hidden; }
+    .status { margin-top: 15px; font-weight: bold; color: #333; font-size: 14px; }
+    .result-box { background: #eef2f7; padding: 12px; border-radius: 6px; margin-top: 15px; text-align: left; font-size: 15px; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h2>📱 Coletor de Expedição</h2>
+  <p>Leitura via Câmera + Zebra ZQ630</p>
+
+  <button onclick="iniciarCamara()" style="background:#17a2b8;">📷 Abrir Câmera para Bipar</button>
+  <div id="reader"></div>
+
+  <p>ou digite manualmente:</p>
+  <input type="text" id="inputXPT" placeholder="Digite o Código/ID...">
+
+  <button id="btnPrint" onclick="processarEImprimir()" style="background:#28a745;">2. Registrar e Imprimir ZPL</button>
+
+  <div id="status" class="status">Status: Pronto</div>
+  <div id="result" class="result-box" style="display:none;"></div>
+</div>
+
+<script>
+  let html5QrcodeScanner;
+  
+  // URL da Implantação Versão 4 capturada do seu print
+  const WEB_APP_URL = "https://script.google.com/a/macros/mercadolivre.com/s/AKfycbxDCxsBXJ2mQ0DSEqsvQVt4HcYT7q6YWcYvQZT1XJLY_ZQ0ha_bjelp-Ansjma10Gvb-g/exec";
+
+  function iniciarCamara() {
+    html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+    html5QrcodeScanner.render((decodedText) => {
+      document.getElementById('inputXPT').value = decodedText;
+      html5QrcodeScanner.clear();
+      processarEImprimir();
+    });
+  }
+
+  async function processarEImprimir() {
+    const codigo = document.getElementById('inputXPT').value.trim();
+    const statusDiv = document.getElementById('status');
+    const resultDiv = document.getElementById('result');
+
+    if (!codigo) {
+      alert("Informe ou bipe um código!");
+      return;
+    }
+
+    statusDiv.innerText = "🔍 Enviando ID para a célula A2 do Sheets...";
+
+    try {
+      // Envia o ID para ser inserido na Coluna A da aba Bipagem
+      let formData = new FormData();
+      formData.append("id", codigo);
+
+      fetch(WEB_APP_URL, {
+        method: "POST",
+        mode: "no-cors",
+        body: formData
+      });
+
+      resultDiv.style.display = "block";
+      resultDiv.innerHTML = `<b>Código Lido:</b> ${codigo}<br><small>Gravado na Coluna A com sucesso!</small>`;
+
+      // Monta o ZPL da etiqueta
+      let zplData = `^XA^PW400^LL240^FO30,30^A0N,28,28^FDPACK: ${codigo}^FS^FO30,80^BQN,2,4^FDQA,${codigo}^FS^XZ`;
+
+      // Chama a impressão na ZQ630 via Zebra PrintConnect
+      let zebraIntentUrl = "intent://com.zebra.printconnect/#Intent;scheme=android-app;S.data=" + encodeURIComponent(zplData) + ";end";
+      window.location.href = zebraIntentUrl;
+
+      statusDiv.innerText = "✅ ID Cadastrado no Sheets e Imprimindo!";
+      statusDiv.style.color = "green";
+
+      document.getElementById('inputXPT').value = '';
+
+    } catch (err) {
+      statusDiv.innerText = "❌ Erro ao enviar: " + err.message;
+      statusDiv.style.color = "red";
+    }
+  }
+</script>
+
+</body>
+</html>
